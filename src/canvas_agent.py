@@ -29,8 +29,7 @@ client = OpenAI(base_url=LM_BASE_URL, api_key=LM_API_KEY)
 
 
 def run_turn(messages: List[Dict[str, Any]]):
-    """Docs-compliant tool-use flow."""
-    # First call with tools
+    # First call with tools (not streaming just tools)
     resp = client.chat.completions.create(
         model=LM_MODEL,
         messages=messages,
@@ -38,26 +37,24 @@ def run_turn(messages: List[Dict[str, Any]]):
         tool_choice="auto",
         temperature=0.0,
     )
-
     msg = resp.choices[0].message
 
     if getattr(msg, "tool_calls", None):
-        messages.append(
-            {
-                "role": "assistant",
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": tc.type,
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
-                        },
-                    }
-                    for tc in msg.tool_calls
-                ],
-            }
-        )
+        # Record tool_calls in the transcript
+        messages.append({
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": tc.type,
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in msg.tool_calls
+            ],
+        })
 
         # Execute tools
         for tc in msg.tool_calls:
@@ -66,18 +63,47 @@ def run_turn(messages: List[Dict[str, Any]]):
             result = execute_function(name, args)
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
-        # Second call without tools
-        final = client.chat.completions.create(
-            model=LM_MODEL, messages=messages, temperature=0.0
+        # Second call (streaming the final answer)
+        stream = client.chat.completions.create(
+            model=LM_MODEL,
+            messages=messages,
+            temperature=0.0,
+            stream=True,
         )
-        final_msg = final.choices[0].message.content or ""
+
+        final_msg_parts: List[str] = []
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            piece = getattr(delta, "content", None)
+            if piece:
+                print(piece, end="", flush=True)
+                final_msg_parts.append(piece)
+
+        print()
+        final_msg = "".join(final_msg_parts) or ""
         messages.append({"role": "assistant", "content": final_msg})
         return final_msg, messages
 
-    # No tools requested respond normally
-    content = msg.content or ""
+    # Stream resposne without tools
+    stream = client.chat.completions.create(
+        model=LM_MODEL,
+        messages=messages + [{"role": "assistant", "content": ""}],
+        stream=True,
+    )
+
+    content_parts: List[str] = []
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+        piece = getattr(delta, "content", None)
+        if piece:
+            print(piece, end="", flush=True)
+            content_parts.append(piece)
+
+    print()
+    content = "".join(content_parts) or ""
     messages.append({"role": "assistant", "content": content})
     return content, messages
+
 
 
 def main():
