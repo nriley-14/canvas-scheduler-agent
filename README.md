@@ -77,13 +77,13 @@ get_upcoming_assignments(days_ahead=10)
 **You:**
 
 ```
-Create a study plan for each assignment and schedule calendar blocks. Assume 2–3 focused sessions per assignment. Estimate durations and place them before each due date.
+Please schedule time to do the Course B Problem Set.
 ```
 
 **What happens:**
 
 1. The LM proposes a plan with estimated durations (e.g., 60–90 mins per session) and concrete time slots in your `TIMEZONE`.
-2. For each approved session, the agent calls:
+2. To schedule, the agent calls:
 
 ```
 create_canvas_event(title, start_at, end_at)
@@ -92,30 +92,8 @@ create_canvas_event(title, start_at, end_at)
 **Assistant (after tool runs):**
 
 ```
-Scheduled 3 study blocks for “Course A — Lab 3”.
-Scheduled 2 study blocks for “Course B — Problem Set”.
+I've scheduled a study time event for you from START to END on DATE. You can access the event in your Canvas calendar.
 ```
-
-### 3) (Optional) Check submission status
-
-**You:**
-
-```
-What’s my submission status for Course A Lab 3?
-```
-
-**Under the hood:**
-
-```
-get_submission_status(course_id=<id>, assignment_id=<id>)
-```
-
-**Assistant:**
-
-```
-missing=False, submitted_at=..., graded_at=None, workflow_state="submitted", score=None
-```
-
 ## Notes
 
 * Timezone-aware ISO strings are used for events (e.g., `2025-10-12T15:00:00-07:00`).
